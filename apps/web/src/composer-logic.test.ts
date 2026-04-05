@@ -24,6 +24,18 @@ describe("detectComposerTrigger", () => {
     });
   });
 
+  it("detects $skill trigger at cursor", () => {
+    const text = "Use $frontend-des";
+    const trigger = detectComposerTrigger(text, text.length);
+
+    expect(trigger).toEqual({
+      kind: "skill",
+      query: "frontend-des",
+      rangeStart: "Use ".length,
+      rangeEnd: text.length,
+    });
+  });
+
   it("detects slash command token while typing command name", () => {
     const text = "/mo";
     const trigger = detectComposerTrigger(text, text.length);
@@ -84,6 +96,19 @@ describe("detectComposerTrigger", () => {
       kind: "path",
       query: "sr",
       rangeStart: "Please inspect ".length,
+      rangeEnd: cursorAfterQuery,
+    });
+  });
+
+  it("detects $skill trigger in the middle of existing text", () => {
+    const text = "Please use $frin this sentence";
+    const cursorAfterQuery = "Please use $fr".length;
+
+    const trigger = detectComposerTrigger(text, cursorAfterQuery);
+    expect(trigger).toEqual({
+      kind: "skill",
+      query: "fr",
+      rangeStart: "Please use ".length,
       rangeEnd: cursorAfterQuery,
     });
   });

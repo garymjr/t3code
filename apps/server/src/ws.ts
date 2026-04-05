@@ -37,6 +37,7 @@ import { ProviderRegistry } from "./provider/Services/ProviderRegistry";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup";
 import { ServerSettingsService } from "./serverSettings";
+import { listInstalledSkills } from "./skills/listSkills";
 import { TerminalManager } from "./terminal/Services/Manager";
 import { WorkspaceEntries } from "./workspace/Services/WorkspaceEntries";
 import { WorkspaceFileSystem } from "./workspace/Services/WorkspaceFileSystem";
@@ -64,6 +65,7 @@ const WsRpcLayer = WsRpcGroup.toLayer(
       const keybindingsConfig = yield* keybindings.loadConfigState;
       const providers = yield* providerRegistry.getProviders;
       const settings = yield* serverSettings.getSettings;
+      const skills = yield* listInstalledSkills(settings.providers.codex.homePath);
 
       return {
         cwd: config.cwd,
@@ -72,6 +74,7 @@ const WsRpcLayer = WsRpcGroup.toLayer(
         issues: keybindingsConfig.issues,
         providers,
         availableEditors: resolveAvailableEditors(),
+        skills,
         observability: {
           logsDirectoryPath: config.logsDir,
           localTracingEnabled: true,
@@ -413,11 +416,15 @@ const WsRpcLayer = WsRpcGroup.toLayer(
               })),
             );
             const settingsUpdates = serverSettings.streamChanges.pipe(
-              Stream.map((settings) => ({
-                version: 1 as const,
-                type: "settingsUpdated" as const,
-                payload: { settings },
-              })),
+              Stream.mapEffect((settings) =>
+                listInstalledSkills(settings.providers.codex.homePath).pipe(
+                  Effect.map((skills) => ({
+                    version: 1 as const,
+                    type: "settingsUpdated" as const,
+                    payload: { settings, skills },
+                  })),
+                ),
+              ),
             );
 
             return Stream.concat(

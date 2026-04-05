@@ -8,6 +8,7 @@ import {
   type ServerLifecycleWelcomePayload,
   type ServerProvider,
   type ServerProviderUpdatedPayload,
+  type ServerSkill,
   type ServerSettings,
 } from "@t3tools/contracts";
 import { Atom } from "effect/unstable/reactivity";
@@ -37,6 +38,7 @@ function toServerConfigUpdatedPayload(config: ServerConfig): ServerConfigUpdated
   return {
     issues: config.issues,
     providers: config.providers,
+    skills: config.skills,
     settings: config.settings,
   };
 }
@@ -44,6 +46,7 @@ function toServerConfigUpdatedPayload(config: ServerConfig): ServerConfigUpdated
 const EMPTY_AVAILABLE_EDITORS: ReadonlyArray<EditorId> = [];
 const EMPTY_KEYBINDINGS: ServerConfig["keybindings"] = [];
 const EMPTY_SERVER_PROVIDERS: ReadonlyArray<ServerProvider> = [];
+const EMPTY_SERVER_SKILLS: ReadonlyArray<ServerSkill> = [];
 
 const selectAvailableEditors = (config: ServerConfig | null): ReadonlyArray<EditorId> =>
   config?.availableEditors ?? EMPTY_AVAILABLE_EDITORS;
@@ -53,6 +56,7 @@ const selectKeybindingsConfigPath = (config: ServerConfig | null) =>
 const selectObservability = (config: ServerConfig | null) => config?.observability ?? null;
 const selectProviders = (config: ServerConfig | null) =>
   config?.providers ?? EMPTY_SERVER_PROVIDERS;
+const selectSkills = (config: ServerConfig | null) => config?.skills ?? EMPTY_SERVER_SKILLS;
 const selectSettings = (config: ServerConfig | null): ServerSettings =>
   config?.settings ?? DEFAULT_SERVER_SETTINGS;
 
@@ -108,7 +112,7 @@ export function applyServerConfigEvent(event: ServerConfigStreamEvent): void {
       return;
     }
     case "settingsUpdated": {
-      applySettingsUpdated(event.payload.settings);
+      applySettingsUpdated(event.payload.settings, event.payload.skills);
       return;
     }
   }
@@ -130,7 +134,10 @@ export function applyProvidersUpdated(payload: ServerProviderUpdatedPayload): vo
   emitServerConfigUpdated(toServerConfigUpdatedPayload(nextConfig), "providerStatuses");
 }
 
-export function applySettingsUpdated(settings: ServerSettings): void {
+export function applySettingsUpdated(
+  settings: ServerSettings,
+  skills: ReadonlyArray<ServerSkill>,
+): void {
   const latestServerConfig = getServerConfig();
   if (!latestServerConfig) {
     return;
@@ -139,6 +146,7 @@ export function applySettingsUpdated(settings: ServerSettings): void {
   const nextConfig = {
     ...latestServerConfig,
     settings,
+    skills: [...skills],
   } satisfies ServerConfig;
   resolveServerConfig(nextConfig);
   emitServerConfigUpdated(toServerConfigUpdatedPayload(nextConfig), "settingsUpdated");
@@ -276,6 +284,10 @@ export function useServerKeybindings(): ServerConfig["keybindings"] {
 
 export function useServerAvailableEditors(): ReadonlyArray<EditorId> {
   return useAtomValue(serverConfigAtom, selectAvailableEditors);
+}
+
+export function useServerSkills(): ReadonlyArray<ServerSkill> {
+  return useAtomValue(serverConfigAtom, selectSkills);
 }
 
 export function useServerKeybindingsConfigPath(): string | null {

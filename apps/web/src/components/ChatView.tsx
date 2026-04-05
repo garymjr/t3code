@@ -198,6 +198,7 @@ import {
   useServerAvailableEditors,
   useServerConfig,
   useServerKeybindings,
+  useServerSkills,
 } from "~/rpc/serverState";
 
 const ATTACHMENT_PREVIEW_HANDOFF_TTL_MS = 5000;
@@ -1398,6 +1399,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const gitStatusQuery = useQuery(gitStatusQueryOptions(gitCwd));
   const keybindings = useServerKeybindings();
   const availableEditors = useServerAvailableEditors();
+  const availableSkills = useServerSkills();
   const modelOptionsByProvider = useMemo(
     () => ({
       codex: providerStatuses.find((provider) => provider.provider === "codex")?.models ?? [],
@@ -1451,6 +1453,26 @@ export default function ChatView({ threadId }: ChatViewProps) {
       }));
     }
 
+    if (composerTrigger.kind === "skill") {
+      const query = composerTrigger.query.trim().toLowerCase();
+      return availableSkills
+        .filter((skill) => {
+          if (!query) return true;
+          return (
+            skill.id.toLowerCase().includes(query) ||
+            skill.name.toLowerCase().includes(query) ||
+            skill.description.toLowerCase().includes(query)
+          );
+        })
+        .map((skill) => ({
+          id: `skill:${skill.id}`,
+          type: "skill",
+          skillId: skill.id,
+          label: `$${skill.id}`,
+          description: skill.description,
+        }));
+    }
+
     if (composerTrigger.kind === "slash-command") {
       const slashCommandItems = [
         {
@@ -1500,7 +1522,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
         label: name,
         description: `${providerLabel} · ${slug}`,
       }));
-  }, [composerTrigger, searchableModelOptions, workspaceEntries]);
+  }, [availableSkills, composerTrigger, searchableModelOptions, workspaceEntries]);
   const composerMenuOpen = Boolean(composerTrigger);
   const activeComposerMenuItem = useMemo(
     () =>
@@ -3693,6 +3715,24 @@ export default function ChatView({ threadId }: ChatViewProps) {
       if (!trigger) return;
       if (item.type === "path") {
         const replacement = `@${item.path} `;
+        const replacementRangeEnd = extendReplacementRangeForTrailingSpace(
+          snapshot.value,
+          trigger.rangeEnd,
+          replacement,
+        );
+        const applied = applyPromptReplacement(
+          trigger.rangeStart,
+          replacementRangeEnd,
+          replacement,
+          { expectedText: snapshot.value.slice(trigger.rangeStart, replacementRangeEnd) },
+        );
+        if (applied) {
+          setComposerHighlightedItemId(null);
+        }
+        return;
+      }
+      if (item.type === "skill") {
+        const replacement = `$${item.skillId} `;
         const replacementRangeEnd = extendReplacementRangeForTrailingSpace(
           snapshot.value,
           trigger.rangeEnd,

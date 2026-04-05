@@ -135,6 +135,7 @@ function createBaseServerConfig(): ServerConfig {
       },
     ],
     availableEditors: [],
+    skills: [],
     observability: {
       logsDirectoryPath: "/repo/project/.t3/logs",
       localTracingEnabled: true,
@@ -2706,6 +2707,46 @@ describe("ChatView timeline estimator parity (full app)", () => {
           expect(menuRect.height).toBeGreaterThan(0);
           expect(menuRect.bottom).toBeLessThanOrEqual(composerRect.bottom);
           expect(hitTarget instanceof Element && menuItem.contains(hitTarget)).toBe(true);
+        },
+        { timeout: 8_000, interval: 16 },
+      );
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("completes skills from the composer when typing $", async () => {
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-skill-menu-target" as MessageId,
+        targetText: "skill menu thread",
+      }),
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          skills: [
+            {
+              id: "frontend-design",
+              name: "frontend-design",
+              description: "Frontend design guidance.",
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      await waitForComposerEditor();
+      await page.getByTestId("composer-editor").fill("$front");
+
+      const menuItem = await waitForComposerMenuItem("skill:frontend-design");
+      menuItem.click();
+
+      await vi.waitFor(
+        () => {
+          const editor = document.querySelector<HTMLElement>('[data-testid="composer-editor"]');
+          expect(editor?.textContent).toContain("$frontend-design ");
         },
         { timeout: 8_000, interval: 16 },
       );
