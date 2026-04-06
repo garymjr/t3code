@@ -927,6 +927,31 @@ describe("collab child conversation routing", () => {
     expect(emitEvent).not.toHaveBeenCalled();
   });
 
+  it("suppresses non-root child notifications before receiver-thread mapping is recorded", () => {
+    const { manager, context, emitEvent, updateSession } = createCollabNotificationHarness();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "turn/started",
+      params: {
+        threadId: "child_provider_1",
+        turn: {
+          id: "turn_child_1",
+          items: [],
+          status: "inProgress",
+          error: null,
+        },
+      },
+    });
+
+    expect(emitEvent).not.toHaveBeenCalled();
+    expect(updateSession).not.toHaveBeenCalled();
+    expect(context.collabReceiverTurns.size).toBe(0);
+  });
+
   it("suppresses child agent message completions", () => {
     const { manager, context, emitEvent } = createCollabNotificationHarness();
 

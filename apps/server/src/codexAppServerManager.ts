@@ -1040,9 +1040,14 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     notification: JsonRpcNotification,
   ): void {
     const rawRoute = this.readRouteFields(notification.params);
-    const childParentTurnId = this.readChildParentTurnId(context, notification.params);
-    const isChildConversation = childParentTurnId !== undefined;
-    if (!isChildConversation) {
+    const providerConversationId = this.readProviderConversationId(notification.params);
+    const childParentTurnId =
+      providerConversationId === undefined
+        ? undefined
+        : context.collabReceiverTurns.get(providerConversationId);
+    const isNonRootConversation = this.isNonRootConversation(context, providerConversationId);
+    const isChildConversation = isNonRootConversation || childParentTurnId !== undefined;
+    if (!isNonRootConversation) {
       this.rememberCollabReceiverTurns(context, notification.params, rawRoute.turnId);
     }
     if (
@@ -1411,10 +1416,10 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
   }
 
   private readProviderConversationId(params: unknown): string | undefined {
-    return (
+    return normalizeProviderThreadId(
       this.readString(params, "threadId") ??
-      this.readString(this.readObject(params, "thread"), "id") ??
-      this.readString(params, "conversationId")
+        this.readString(this.readObject(params, "thread"), "id") ??
+        this.readString(params, "conversationId"),
     );
   }
 
@@ -1443,11 +1448,26 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
 
     const receiverThreadIds =
       this.readArray(item, "receiverThreadIds")
-        ?.map((value) => (typeof value === "string" ? value : null))
+        ?.map((value) => (typeof value === "string" ? normalizeProviderThreadId(value) : null))
         .filter((value): value is string => value !== null) ?? [];
     for (const receiverThreadId of receiverThreadIds) {
       context.collabReceiverTurns.set(receiverThreadId, parentTurnId);
     }
+  }
+
+  private isNonRootConversation(
+    context: CodexSessionContext,
+    providerConversationId: string | undefined,
+  ): boolean {
+    if (!providerConversationId) {
+      return false;
+    }
+
+    const rootProviderConversationId = readResumeCursorThreadId(context.session.resumeCursor);
+    return (
+      rootProviderConversationId !== undefined &&
+      providerConversationId !== rootProviderConversationId
+    );
   }
 
   private shouldSuppressChildConversationNotification(method: string, params: unknown): boolean {
