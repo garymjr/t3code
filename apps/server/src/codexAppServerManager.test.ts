@@ -969,6 +969,49 @@ describe("collab child conversation routing", () => {
     expect(emitEvent).not.toHaveBeenCalled();
   });
 
+  it("does not register grandchild receiver threads from child collab completions", () => {
+    const { manager, context, emitEvent } = createCollabNotificationHarness();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/completed",
+      params: {
+        item: {
+          type: "collabAgentToolCall",
+          id: "call_parent_1",
+          receiverThreadIds: ["child_provider_1"],
+        },
+        threadId: "provider_parent",
+        turnId: "turn_parent",
+      },
+    });
+    emitEvent.mockClear();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/completed",
+      params: {
+        item: {
+          type: "collabAgentToolCall",
+          id: "call_child_1",
+          receiverThreadIds: ["grandchild_provider_1"],
+        },
+        threadId: "child_provider_1",
+        turnId: "turn_child_1",
+      },
+    });
+
+    expect(context.collabReceiverTurns.get("child_provider_1")).toBe("turn_parent");
+    expect(context.collabReceiverTurns.has("grandchild_provider_1")).toBe(false);
+    expect(emitEvent).not.toHaveBeenCalled();
+  });
+
   it("suppresses child lifecycle notifications so they cannot replace the parent turn", () => {
     const { manager, context, emitEvent, updateSession } = createCollabNotificationHarness();
 

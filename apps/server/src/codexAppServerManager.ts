@@ -1040,9 +1040,11 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     notification: JsonRpcNotification,
   ): void {
     const rawRoute = this.readRouteFields(notification.params);
-    this.rememberCollabReceiverTurns(context, notification.params, rawRoute.turnId);
     const childParentTurnId = this.readChildParentTurnId(context, notification.params);
     const isChildConversation = childParentTurnId !== undefined;
+    if (!isChildConversation) {
+      this.rememberCollabReceiverTurns(context, notification.params, rawRoute.turnId);
+    }
     if (
       isChildConversation &&
       this.shouldSuppressChildConversationNotification(notification.method, notification.params)
