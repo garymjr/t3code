@@ -77,6 +77,7 @@ const COMPOSER_EDITOR_HMR_KEY = `composer-editor-${Math.random().toString(36).sl
 type SerializedComposerMentionNode = Spread<
   {
     path: string;
+    token: "path" | "skill";
     type: "composer-mention";
     version: 1;
   },
@@ -106,23 +107,27 @@ class ComposerMentionNode extends TextNode {
   }
 
   static override clone(node: ComposerMentionNode): ComposerMentionNode {
-    return new ComposerMentionNode(node.__path, node.__key);
+    return new ComposerMentionNode(node.__path, node.__token, node.__key);
   }
 
   static override importJSON(serializedNode: SerializedComposerMentionNode): ComposerMentionNode {
-    return $createComposerMentionNode(serializedNode.path);
+    return $createComposerMentionNode(serializedNode.path, serializedNode.token);
   }
 
-  constructor(path: string, key?: NodeKey) {
-    const normalizedPath = path.startsWith("@") ? path.slice(1) : path;
-    super(`@${normalizedPath}`, key);
+  constructor(path: string, token: "path" | "skill" = "path", key?: NodeKey) {
+    const normalizedPath = path.startsWith("@") || path.startsWith("$") ? path.slice(1) : path;
+    super(`${token === "skill" ? "$" : "@"}${normalizedPath}`, key);
     this.__path = normalizedPath;
+    this.__token = token;
   }
+
+  __token: "path" | "skill";
 
   override exportJSON(): SerializedComposerMentionNode {
     return {
       ...super.exportJSON(),
       path: this.__path,
+      token: this.__token,
       type: "composer-mention",
       version: 1,
     };
@@ -133,7 +138,7 @@ class ComposerMentionNode extends TextNode {
     dom.className = COMPOSER_INLINE_CHIP_CLASS_NAME;
     dom.contentEditable = "false";
     dom.setAttribute("spellcheck", "false");
-    renderMentionChipDom(dom, this.__path);
+    renderMentionChipDom(dom, this.__path, this.__token);
     return dom;
   }
 
@@ -143,8 +148,12 @@ class ComposerMentionNode extends TextNode {
     _config: EditorConfig,
   ): boolean {
     dom.contentEditable = "false";
-    if (prevNode.__text !== this.__text || prevNode.__path !== this.__path) {
-      renderMentionChipDom(dom, this.__path);
+    if (
+      prevNode.__text !== this.__text ||
+      prevNode.__path !== this.__path ||
+      prevNode.__token !== this.__token
+    ) {
+      renderMentionChipDom(dom, this.__path, this.__token);
     }
     return false;
   }
@@ -166,8 +175,11 @@ class ComposerMentionNode extends TextNode {
   }
 }
 
-function $createComposerMentionNode(path: string): ComposerMentionNode {
-  return $applyNodeReplacement(new ComposerMentionNode(path));
+function $createComposerMentionNode(
+  path: string,
+  token: "path" | "skill" = "path",
+): ComposerMentionNode {
+  return $applyNodeReplacement(new ComposerMentionNode(path, token));
 }
 
 function ComposerTerminalContextDecorator(props: { context: TerminalContextDraft }) {
@@ -246,22 +258,32 @@ function resolvedThemeFromDocument(): "light" | "dark" {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
-function renderMentionChipDom(container: HTMLElement, pathValue: string): void {
+function renderMentionChipDom(
+  container: HTMLElement,
+  pathValue: string,
+  token: "path" | "skill",
+): void {
   container.textContent = "";
   container.style.setProperty("user-select", "none");
   container.style.setProperty("-webkit-user-select", "none");
 
-  const theme = resolvedThemeFromDocument();
-  const icon = document.createElement("img");
-  icon.alt = "";
+  const icon = token === "skill" ? document.createElement("span") : document.createElement("img");
+
   icon.ariaHidden = "true";
   icon.className = COMPOSER_INLINE_CHIP_ICON_CLASS_NAME;
-  icon.loading = "lazy";
-  icon.src = getVscodeIconUrlForEntry(pathValue, inferEntryKindFromPath(pathValue), theme);
+
+  if (icon instanceof HTMLImageElement) {
+    const theme = resolvedThemeFromDocument();
+    icon.alt = "";
+    icon.loading = "lazy";
+    icon.src = getVscodeIconUrlForEntry(pathValue, inferEntryKindFromPath(pathValue), theme);
+  } else {
+    icon.textContent = "$";
+  }
 
   const label = document.createElement("span");
   label.className = COMPOSER_INLINE_CHIP_LABEL_CLASS_NAME;
-  label.textContent = basenameOfPath(pathValue);
+  label.textContent = token === "skill" ? pathValue : basenameOfPath(pathValue);
 
   container.append(icon, label);
 }
@@ -600,7 +622,7 @@ function $setComposerEditorPrompt(
   const segments = splitPromptIntoComposerSegments(prompt, terminalContexts);
   for (const segment of segments) {
     if (segment.type === "mention") {
-      paragraph.append($createComposerMentionNode(segment.path));
+      paragraph.append($createComposerMentionNode(segment.path, segment.token));
       continue;
     }
     if (segment.type === "terminal-context") {

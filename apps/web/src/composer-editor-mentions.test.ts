@@ -7,7 +7,7 @@ describe("splitPromptIntoComposerSegments", () => {
   it("splits mention tokens followed by whitespace into mention segments", () => {
     expect(splitPromptIntoComposerSegments("Inspect @AGENTS.md please")).toEqual([
       { type: "text", text: "Inspect " },
-      { type: "mention", path: "AGENTS.md" },
+      { type: "mention", token: "path", path: "AGENTS.md" },
       { type: "text", text: " please" },
     ]);
   });
@@ -21,8 +21,16 @@ describe("splitPromptIntoComposerSegments", () => {
   it("keeps newlines around mention tokens", () => {
     expect(splitPromptIntoComposerSegments("one\n@src/index.ts \ntwo")).toEqual([
       { type: "text", text: "one\n" },
-      { type: "mention", path: "src/index.ts" },
+      { type: "mention", token: "path", path: "src/index.ts" },
       { type: "text", text: " \ntwo" },
+    ]);
+  });
+
+  it("splits skill tokens followed by whitespace into mention-style segments", () => {
+    expect(splitPromptIntoComposerSegments("Use $frontend-design here")).toEqual([
+      { type: "text", text: "Use " },
+      { type: "mention", token: "skill", path: "frontend-design" },
+      { type: "text", text: " here" },
     ]);
   });
 
@@ -34,7 +42,7 @@ describe("splitPromptIntoComposerSegments", () => {
     ).toEqual([
       { type: "text", text: "Inspect " },
       { type: "terminal-context", context: null },
-      { type: "mention", path: "AGENTS.md" },
+      { type: "mention", token: "path", path: "AGENTS.md" },
       { type: "text", text: " please" },
     ]);
   });
