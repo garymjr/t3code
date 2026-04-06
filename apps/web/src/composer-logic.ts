@@ -13,7 +13,10 @@ export interface ComposerTrigger {
 
 const SLASH_COMMANDS: readonly ComposerSlashCommand[] = ["model", "plan", "default"];
 const isInlineTokenSegment = (
-  segment: { type: "text"; text: string } | { type: "mention" } | { type: "terminal-context" },
+  segment:
+    | { type: "text"; text: string }
+    | { type: "mention"; token: "path" | "skill" }
+    | { type: "terminal-context" },
 ): boolean => segment.type !== "text";
 
 function clampCursor(text: string, cursor: number): number {
@@ -80,7 +83,10 @@ export function expandCollapsedComposerCursor(text: string, cursorInput: number)
 }
 
 function collapsedSegmentLength(
-  segment: { type: "text"; text: string } | { type: "mention" } | { type: "terminal-context" },
+  segment:
+    | { type: "text"; text: string }
+    | { type: "mention"; token: "path" | "skill" }
+    | { type: "terminal-context" },
 ): number {
   if (segment.type === "text") {
     return segment.text.length;
@@ -90,7 +96,9 @@ function collapsedSegmentLength(
 
 function clampCollapsedComposerCursorForSegments(
   segments: ReadonlyArray<
-    { type: "text"; text: string } | { type: "mention" } | { type: "terminal-context" }
+    | { type: "text"; text: string }
+    | { type: "mention"; token: "path" | "skill" }
+    | { type: "terminal-context" }
   >,
   cursorInput: number,
 ): number {

@@ -10,6 +10,7 @@ export type ComposerPromptSegment =
     }
   | {
       type: "mention";
+      token: "path" | "skill";
       path: string;
     }
   | {
@@ -18,6 +19,7 @@ export type ComposerPromptSegment =
     };
 
 const MENTION_TOKEN_REGEX = /(^|\s)@([^\s@]+)(?=\s)/g;
+const SKILL_TOKEN_REGEX = /(^|\s)\$([^\s$]+)(?=\s)/g;
 
 function pushTextSegment(segments: ComposerPromptSegment[], text: string): void {
   if (!text) return;
@@ -35,8 +37,19 @@ function splitPromptTextIntoComposerSegments(text: string): ComposerPromptSegmen
     return segments;
   }
 
+  const matches = [
+    ...Array.from(text.matchAll(MENTION_TOKEN_REGEX), (match) => ({
+      match,
+      token: "path" as const,
+    })),
+    ...Array.from(text.matchAll(SKILL_TOKEN_REGEX), (match) => ({
+      match,
+      token: "skill" as const,
+    })),
+  ].toSorted((left, right) => (left.match.index ?? 0) - (right.match.index ?? 0));
+
   let cursor = 0;
-  for (const match of text.matchAll(MENTION_TOKEN_REGEX)) {
+  for (const { match, token } of matches) {
     const fullMatch = match[0];
     const prefix = match[1] ?? "";
     const path = match[2] ?? "";
@@ -49,7 +62,7 @@ function splitPromptTextIntoComposerSegments(text: string): ComposerPromptSegmen
     }
 
     if (path.length > 0) {
-      segments.push({ type: "mention", path });
+      segments.push({ type: "mention", token, path });
     } else {
       pushTextSegment(segments, text.slice(mentionStart, mentionEnd));
     }

@@ -143,10 +143,23 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
           model
         </Badge>
       ) : null}
-      <span className="flex min-w-0 items-center gap-1.5 truncate">
-        <span className="truncate">{props.item.label}</span>
-      </span>
-      <span className="truncate text-muted-foreground/70 text-xs">{props.item.description}</span>
+      {props.item.type === "skill" ? (
+        <span className="flex min-w-0 flex-1 flex-col py-0.5">
+          <span className="break-all text-sm leading-tight">{props.item.label}</span>
+          <span className="line-clamp-2 text-muted-foreground/70 text-xs leading-snug">
+            {props.item.description}
+          </span>
+        </span>
+      ) : (
+        <>
+          <span className="flex min-w-0 items-center gap-1.5 truncate">
+            <span className="truncate">{props.item.label}</span>
+          </span>
+          <span className="truncate text-muted-foreground/70 text-xs">
+            {props.item.description}
+          </span>
+        </>
+      )}
     </CommandItem>
   );
 });
