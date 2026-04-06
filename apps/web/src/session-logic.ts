@@ -461,7 +461,7 @@ export function deriveWorkLogEntries(
   const ordered = [...activities].toSorted(compareActivitiesByOrder);
   const entries = ordered
     .filter((activity) => (latestTurnId ? activity.turnId === latestTurnId : true))
-    .filter((activity) => activity.kind !== "tool.started")
+    .filter((activity) => !isHiddenToolStartedActivity(activity))
     .filter((activity) => activity.kind !== "task.started" && activity.kind !== "task.completed")
     .filter((activity) => activity.kind !== "context-window.updated")
     .filter((activity) => activity.summary !== "Checkpoint captured")
@@ -470,6 +470,18 @@ export function deriveWorkLogEntries(
   return collapseDerivedWorkLogEntries(entries).map(
     ({ activityKind: _activityKind, collapseKey: _collapseKey, ...entry }) => entry,
   );
+}
+
+function isHiddenToolStartedActivity(activity: OrchestrationThreadActivity): boolean {
+  if (activity.kind !== "tool.started") {
+    return false;
+  }
+
+  const payload =
+    activity.payload && typeof activity.payload === "object"
+      ? (activity.payload as Record<string, unknown>)
+      : null;
+  return payload?.itemType !== "collab_agent_tool_call";
 }
 
 function isPlanBoundaryToolActivity(activity: OrchestrationThreadActivity): boolean {

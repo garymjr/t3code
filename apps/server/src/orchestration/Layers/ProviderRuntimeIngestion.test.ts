@@ -1857,6 +1857,97 @@ describe("ProviderRuntimeIngestion", () => {
     ).toBe(true);
   });
 
+  it("projects collab agent starts as a single subagent activity row", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.started",
+      eventId: asEventId("evt-collab-started"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-collab"),
+      payload: {
+        itemType: "collab_agent_tool_call",
+        status: "inProgress",
+        title: "Subagent task",
+        data: {
+          item: {
+            name: "Aquinas",
+            agentType: "explorer",
+            instructions: "Review the public/user-facing input paths.",
+            receiverThreadIds: ["child-thread-1"],
+          },
+        },
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.activities.some(
+        (activity: ProviderRuntimeTestActivity) => activity.id === "evt-collab-started",
+      ),
+    );
+    const activity = thread.activities.find(
+      (entry: ProviderRuntimeTestActivity) => entry.id === "evt-collab-started",
+    );
+
+    expect(activity).toMatchObject({
+      kind: "tool.started",
+      summary: "Created Aquinas (explorer) with the instructions:",
+      payload: {
+        itemType: "collab_agent_tool_call",
+        subagentName: "Aquinas",
+        subagentRole: "explorer",
+        detail: "Review the public/user-facing input paths.",
+        instructions: "Review the public/user-facing input paths.",
+        receiverThreadIds: ["child-thread-1"],
+      },
+      turnId: "turn-collab",
+    });
+  });
+
+  it("suppresses collab agent update and completion activity rows", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.updated",
+      eventId: asEventId("evt-collab-updated"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-collab"),
+      payload: {
+        itemType: "collab_agent_tool_call",
+        detail: "working",
+      },
+    });
+    harness.emit({
+      type: "item.completed",
+      eventId: asEventId("evt-collab-completed"),
+      provider: "codex",
+      createdAt: new Date().toISOString(),
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-collab"),
+      payload: {
+        itemType: "collab_agent_tool_call",
+        detail: "done",
+      },
+    });
+
+    await harness.drain();
+    const readModel = await Effect.runPromise(harness.engine.getReadModel());
+    const thread = readModel.threads.find((entry) => entry.id === asThreadId("thread-1"));
+
+    expect(
+      thread?.activities.some(
+        (activity: ProviderRuntimeTestActivity) =>
+          activity.id === "evt-collab-updated" || activity.id === "evt-collab-completed",
+      ),
+    ).toBe(false);
+  });
+
   it("consumes P1 runtime events into thread metadata, diff checkpoints, and activities", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();

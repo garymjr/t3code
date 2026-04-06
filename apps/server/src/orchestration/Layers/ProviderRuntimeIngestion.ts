@@ -158,6 +158,65 @@ function requestKindFromCanonicalRequestType(
   }
 }
 
+function asObjectRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function asTrimmedString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function extractCollabAgentMetadata(payload: unknown): {
+  subagentName?: string;
+  subagentRole?: string;
+  instructions?: string;
+  receiverThreadIds?: string[];
+} {
+  const data = asObjectRecord(payload);
+  const item = asObjectRecord(data?.item) ?? data;
+  const receiverThreadIds =
+    (Array.isArray(item?.receiverThreadIds) ? item.receiverThreadIds : [])
+      .map((value) => asTrimmedString(value))
+      .filter((value): value is string => value !== undefined) || [];
+  const subagentName =
+    asTrimmedString(item?.name) ??
+    asTrimmedString(item?.agentName) ??
+    asTrimmedString(item?.displayName) ??
+    asTrimmedString(item?.nickname);
+  const subagentRole =
+    asTrimmedString(item?.agentType) ??
+    asTrimmedString(item?.role) ??
+    asTrimmedString(item?.taskType);
+  const instructions =
+    asTrimmedString(item?.instructions) ??
+    asTrimmedString(item?.prompt) ??
+    asTrimmedString(item?.task) ??
+    asTrimmedString(item?.description);
+
+  return {
+    ...(subagentName ? { subagentName } : {}),
+    ...(subagentRole ? { subagentRole } : {}),
+    ...(instructions ? { instructions } : {}),
+    ...(receiverThreadIds.length > 0 ? { receiverThreadIds } : {}),
+  };
+}
+
+function buildCollabAgentSummary(input: { subagentName?: string; subagentRole?: string }): string {
+  const { subagentName, subagentRole } = input;
+  if (subagentName && subagentRole) {
+    return `Created ${subagentName} (${subagentRole}) with the instructions:`;
+  }
+  if (subagentName) {
+    return `Created ${subagentName} with the instructions:`;
+  }
+  if (subagentRole) {
+    return `Created subagent (${subagentRole}) with the instructions:`;
+  }
+  return "Created subagent with the instructions:";
+}
+
 function runtimeEventToActivities(
   event: ProviderRuntimeEvent,
 ): ReadonlyArray<OrchestrationThreadActivity> {
@@ -432,6 +491,9 @@ function runtimeEventToActivities(
       if (!isToolLifecycleItemType(event.payload.itemType)) {
         return [];
       }
+      if (event.payload.itemType === "collab_agent_tool_call") {
+        return [];
+      }
       return [
         {
           id: event.eventId,
@@ -455,6 +517,9 @@ function runtimeEventToActivities(
       if (!isToolLifecycleItemType(event.payload.itemType)) {
         return [];
       }
+      if (event.payload.itemType === "collab_agent_tool_call") {
+        return [];
+      }
       return [
         {
           id: event.eventId,
@@ -475,6 +540,28 @@ function runtimeEventToActivities(
     case "item.started": {
       if (!isToolLifecycleItemType(event.payload.itemType)) {
         return [];
+      }
+      if (event.payload.itemType === "collab_agent_tool_call") {
+        const collab = extractCollabAgentMetadata(event.payload.data);
+        return [
+          {
+            id: event.eventId,
+            createdAt: event.createdAt,
+            tone: "tool",
+            kind: "tool.started",
+            summary: buildCollabAgentSummary(collab),
+            payload: {
+              itemType: event.payload.itemType,
+              ...(collab.subagentName ? { subagentName: collab.subagentName } : {}),
+              ...(collab.subagentRole ? { subagentRole: collab.subagentRole } : {}),
+              ...(collab.instructions ? { detail: collab.instructions } : {}),
+              ...(collab.instructions ? { instructions: collab.instructions } : {}),
+              ...(collab.receiverThreadIds ? { receiverThreadIds: collab.receiverThreadIds } : {}),
+            },
+            turnId: toTurnId(event.turnId) ?? null,
+            ...maybeSequence,
+          },
+        ];
       }
       return [
         {

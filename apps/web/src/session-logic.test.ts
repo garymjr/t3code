@@ -564,6 +564,41 @@ describe("deriveWorkLogEntries", () => {
     expect(entries.map((entry) => entry.id)).toEqual(["tool-complete"]);
   });
 
+  it("keeps collab agent start entries in the work log", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "subagent-start",
+        createdAt: "2026-02-23T00:00:01.000Z",
+        kind: "tool.started",
+        summary: "Created Aquinas (explorer) with the instructions:",
+        payload: {
+          itemType: "collab_agent_tool_call",
+          detail: "Review the public/user-facing input paths.",
+          instructions: "Review the public/user-facing input paths.",
+        },
+      }),
+      makeActivity({
+        id: "other-tool-start",
+        createdAt: "2026-02-23T00:00:02.000Z",
+        kind: "tool.started",
+        summary: "Tool call",
+        payload: {
+          itemType: "command_execution",
+          detail: "pwd",
+        },
+      }),
+    ];
+
+    const entries = deriveWorkLogEntries(activities, undefined);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      id: "subagent-start",
+      itemType: "collab_agent_tool_call",
+      label: "Created Aquinas (explorer) with the instructions:",
+      detail: "Review the public/user-facing input paths.",
+    });
+  });
+
   it("omits task start and completion lifecycle entries", () => {
     const activities: OrchestrationThreadActivity[] = [
       makeActivity({

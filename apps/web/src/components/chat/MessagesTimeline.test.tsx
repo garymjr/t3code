@@ -140,4 +140,51 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("Context compacted");
     expect(markup).toContain("Work log");
   });
+
+  it("renders collab agent start entries as a two-line work log row", async () => {
+    const { MessagesTimeline } = await import("./MessagesTimeline");
+    const markup = renderToStaticMarkup(
+      <MessagesTimeline
+        hasMessages
+        isWorking={false}
+        activeTurnInProgress={false}
+        activeTurnStartedAt={null}
+        scrollContainer={null}
+        timelineEntries={[
+          {
+            id: "entry-1",
+            kind: "work",
+            createdAt: "2026-03-17T19:12:28.000Z",
+            entry: {
+              id: "work-1",
+              createdAt: "2026-03-17T19:12:28.000Z",
+              label: "Created Aquinas (explorer) with the instructions:",
+              detail: "Review the public/user-facing input paths.",
+              tone: "tool",
+              itemType: "collab_agent_tool_call",
+            },
+          },
+        ]}
+        completionDividerBeforeEntryId={null}
+        completionSummary={null}
+        turnDiffSummaryByAssistantMessageId={new Map()}
+        nowIso="2026-03-17T19:12:30.000Z"
+        expandedWorkGroups={{}}
+        onToggleWorkGroup={() => {}}
+        onOpenTurnDiff={() => {}}
+        revertTurnCountByUserMessageId={new Map()}
+        onRevertUserMessage={() => {}}
+        isRevertingCheckpoint={false}
+        onImageExpand={() => {}}
+        markdownCwd={undefined}
+        resolvedTheme="light"
+        timestampFormat="locale"
+        workspaceRoot={undefined}
+      />,
+    );
+
+    expect(markup).toContain("Created Aquinas (explorer) with the instructions:");
+    expect(markup).toContain("Review the public/user-facing input paths.");
+    expect(markup).not.toContain(" - Review the public/user-facing input paths.");
+  });
 });

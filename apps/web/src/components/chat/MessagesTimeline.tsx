@@ -843,6 +843,11 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
   const displayText = preview ? `${heading} - ${preview}` : heading;
   const hasChangedFiles = (workEntry.changedFiles?.length ?? 0) > 0;
   const previewIsChangedFiles = hasChangedFiles && !workEntry.command && !workEntry.detail;
+  const showCollabInstructions =
+    workEntry.itemType === "collab_agent_tool_call" &&
+    preview &&
+    !workEntry.command &&
+    !previewIsChangedFiles;
 
   return (
     <div className="rounded-lg px-1 py-1">
@@ -853,19 +858,38 @@ const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: {
           <EntryIcon className="size-3" />
         </span>
         <div className="min-w-0 flex-1 overflow-hidden">
-          <p
-            className={cn(
-              "truncate text-[11px] leading-5",
-              workToneClass(workEntry.tone),
-              preview ? "text-muted-foreground/70" : "",
-            )}
-            title={displayText}
-          >
-            <span className={cn("text-foreground/80", workToneClass(workEntry.tone))}>
-              {heading}
-            </span>
-            {preview && <span className="text-muted-foreground/55"> - {preview}</span>}
-          </p>
+          {showCollabInstructions ? (
+            <div className="space-y-0.5">
+              <p
+                className={cn("truncate text-[11px] leading-5", workToneClass(workEntry.tone))}
+                title={heading}
+              >
+                <span className={cn("text-foreground/80", workToneClass(workEntry.tone))}>
+                  {heading}
+                </span>
+              </p>
+              <p
+                className="truncate text-[11px] leading-5 text-muted-foreground/55"
+                title={preview}
+              >
+                {preview}
+              </p>
+            </div>
+          ) : (
+            <p
+              className={cn(
+                "truncate text-[11px] leading-5",
+                workToneClass(workEntry.tone),
+                preview ? "text-muted-foreground/70" : "",
+              )}
+              title={displayText}
+            >
+              <span className={cn("text-foreground/80", workToneClass(workEntry.tone))}>
+                {heading}
+              </span>
+              {preview && <span className="text-muted-foreground/55"> - {preview}</span>}
+            </p>
+          )}
         </div>
       </div>
       {hasChangedFiles && !previewIsChangedFiles && (

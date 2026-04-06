@@ -1045,7 +1045,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     const isChildConversation = childParentTurnId !== undefined;
     if (
       isChildConversation &&
-      this.shouldSuppressChildConversationNotification(notification.method)
+      this.shouldSuppressChildConversationNotification(notification.method, notification.params)
     ) {
       return;
     }
@@ -1448,22 +1448,10 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     }
   }
 
-  private shouldSuppressChildConversationNotification(method: string): boolean {
-    return (
-      method === "thread/started" ||
-      method === "thread/status/changed" ||
-      method === "thread/archived" ||
-      method === "thread/unarchived" ||
-      method === "thread/closed" ||
-      method === "thread/compacted" ||
-      method === "thread/name/updated" ||
-      method === "thread/tokenUsage/updated" ||
-      method === "turn/started" ||
-      method === "turn/completed" ||
-      method === "turn/aborted" ||
-      method === "turn/plan/updated" ||
-      method === "item/plan/delta"
-    );
+  private shouldSuppressChildConversationNotification(method: string, params: unknown): boolean {
+    void method;
+    void params;
+    return true;
   }
 
   private readObject(value: unknown, key?: string): Record<string, unknown> | undefined {

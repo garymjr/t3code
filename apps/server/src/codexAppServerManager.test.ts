@@ -851,7 +851,7 @@ describe("respondToUserInput", () => {
 });
 
 describe("collab child conversation routing", () => {
-  it("rewrites child notification turn ids onto the parent turn", () => {
+  it("records child receiver threads from the parent collab tool completion", () => {
     const { manager, context, emitEvent } = createCollabNotificationHarness();
 
     (
@@ -885,13 +885,88 @@ describe("collab child conversation routing", () => {
       },
     });
 
-    expect(emitEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        method: "item/agentMessage/delta",
+    expect(context.collabReceiverTurns.get("child_provider_1")).toBe("turn_parent");
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses child agent message deltas", () => {
+    const { manager, context, emitEvent } = createCollabNotificationHarness();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/completed",
+      params: {
+        item: {
+          type: "collabAgentToolCall",
+          id: "call_collab_1",
+          receiverThreadIds: ["child_provider_1"],
+        },
+        threadId: "provider_parent",
         turnId: "turn_parent",
+      },
+    });
+    emitEvent.mockClear();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/agentMessage/delta",
+      params: {
+        threadId: "child_provider_1",
+        turnId: "turn_child_1",
         itemId: "msg_child_1",
-      }),
-    );
+        delta: "working",
+      },
+    });
+
+    expect(emitEvent).not.toHaveBeenCalled();
+  });
+
+  it("suppresses child agent message completions", () => {
+    const { manager, context, emitEvent } = createCollabNotificationHarness();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/completed",
+      params: {
+        item: {
+          type: "collabAgentToolCall",
+          id: "call_collab_1",
+          receiverThreadIds: ["child_provider_1"],
+        },
+        threadId: "provider_parent",
+        turnId: "turn_parent",
+      },
+    });
+    emitEvent.mockClear();
+
+    (
+      manager as unknown as {
+        handleServerNotification: (context: unknown, notification: Record<string, unknown>) => void;
+      }
+    ).handleServerNotification(context, {
+      method: "item/completed",
+      params: {
+        threadId: "child_provider_1",
+        turnId: "turn_child_1",
+        itemId: "msg_child_1",
+        item: {
+          type: "agentMessage",
+          id: "msg_child_1",
+          text: "done",
+        },
+      },
+    });
+
+    expect(emitEvent).not.toHaveBeenCalled();
   });
 
   it("suppresses child lifecycle notifications so they cannot replace the parent turn", () => {
