@@ -169,6 +169,7 @@ function asTrimmedString(value: unknown): string | undefined {
 }
 
 function extractCollabAgentMetadata(payload: unknown): {
+  tool?: string;
   subagentName?: string;
   subagentRole?: string;
   instructions?: string;
@@ -180,6 +181,7 @@ function extractCollabAgentMetadata(payload: unknown): {
     (Array.isArray(item?.receiverThreadIds) ? item.receiverThreadIds : [])
       .map((value) => asTrimmedString(value))
       .filter((value): value is string => value !== undefined) || [];
+  const tool = asTrimmedString(item?.tool);
   const subagentName =
     asTrimmedString(item?.name) ??
     asTrimmedString(item?.agentName) ??
@@ -196,6 +198,7 @@ function extractCollabAgentMetadata(payload: unknown): {
     asTrimmedString(item?.description);
 
   return {
+    ...(tool ? { tool } : {}),
     ...(subagentName ? { subagentName } : {}),
     ...(subagentRole ? { subagentRole } : {}),
     ...(instructions ? { instructions } : {}),
@@ -203,8 +206,20 @@ function extractCollabAgentMetadata(payload: unknown): {
   };
 }
 
-function buildCollabAgentSummary(input: { subagentName?: string; subagentRole?: string }): string {
-  const { subagentName, subagentRole } = input;
+function buildCollabAgentSummary(input: {
+  tool?: string;
+  subagentName?: string;
+  subagentRole?: string;
+  receiverThreadIds?: string[];
+}): string {
+  const { tool, subagentName, subagentRole, receiverThreadIds } = input;
+  if (tool === "wait") {
+    const count = receiverThreadIds?.length ?? 0;
+    if (count > 1) {
+      return `Waiting on ${count} subagents`;
+    }
+    return "Waiting on subagent";
+  }
   if (subagentName && subagentRole) {
     return `Created ${subagentName} (${subagentRole}) with the instructions:`;
   }

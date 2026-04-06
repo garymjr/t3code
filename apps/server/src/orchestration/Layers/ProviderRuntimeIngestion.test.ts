@@ -1948,6 +1948,51 @@ describe("ProviderRuntimeIngestion", () => {
     ).toBe(false);
   });
 
+  it("labels collab wait starts without pretending they have instructions", async () => {
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+
+    harness.emit({
+      type: "item.started",
+      eventId: asEventId("evt-collab-wait-started"),
+      provider: "codex",
+      createdAt: now,
+      threadId: asThreadId("thread-1"),
+      turnId: asTurnId("turn-collab-wait"),
+      payload: {
+        itemType: "collab_agent_tool_call",
+        status: "inProgress",
+        data: {
+          item: {
+            tool: "wait",
+            receiverThreadIds: ["child-thread-1", "child-thread-2"],
+          },
+        },
+      },
+    });
+
+    const thread = await waitForThread(harness.engine, (entry) =>
+      entry.activities.some(
+        (activity: ProviderRuntimeTestActivity) => activity.id === "evt-collab-wait-started",
+      ),
+    );
+    const activity = thread.activities.find(
+      (entry: ProviderRuntimeTestActivity) => entry.id === "evt-collab-wait-started",
+    );
+
+    expect(activity).toMatchObject({
+      kind: "tool.started",
+      summary: "Waiting on 2 subagents",
+      payload: {
+        itemType: "collab_agent_tool_call",
+        receiverThreadIds: ["child-thread-1", "child-thread-2"],
+      },
+      turnId: "turn-collab-wait",
+    });
+    expect(activity?.payload).not.toHaveProperty("detail");
+    expect(activity?.payload).not.toHaveProperty("instructions");
+  });
+
   it("consumes P1 runtime events into thread metadata, diff checkpoints, and activities", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();
