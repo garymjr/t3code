@@ -10,6 +10,8 @@ import type {
   OrchestrationCheckpointSummary,
   OrchestrationProject,
   OrchestrationReadModel,
+  OrchestrationThread,
+  OrchestrationGetSnapshotInput,
   ProjectId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -42,7 +44,16 @@ export interface ProjectionSnapshotQueryShape {
    * Rehydrates from projection tables and derives snapshot sequence from
    * projector cursor state.
    */
-  readonly getSnapshot: () => Effect.Effect<OrchestrationReadModel, ProjectionRepositoryError>;
+  readonly getSnapshot: (
+    input?: OrchestrationGetSnapshotInput,
+  ) => Effect.Effect<OrchestrationReadModel, ProjectionRepositoryError>;
+
+  /**
+   * Read a single fully hydrated thread snapshot.
+   */
+  readonly getThread: (
+    threadId: ThreadId,
+  ) => Effect.Effect<Option.Option<OrchestrationThread>, ProjectionRepositoryError>;
 
   /**
    * Read aggregate projection counts without hydrating the full read model.

@@ -1,7 +1,7 @@
 import {
   OrchestrationEvent,
   type ServerLifecycleWelcomePayload,
-  type ThreadId,
+  ThreadId,
 } from "@t3tools/contracts";
 import {
   Outlet,
@@ -226,7 +226,9 @@ function EventRouter() {
   const handledBootstrapThreadIdRef = useRef<string | null>(null);
   const seenServerConfigUpdateIdRef = useRef(getServerConfigUpdatedNotification()?.id ?? 0);
   const disposedRef = useRef(false);
-  const bootstrapFromSnapshotRef = useRef<() => Promise<void>>(async () => undefined);
+  const bootstrapFromSnapshotRef = useRef<(preferredThreadId?: ThreadId | null) => Promise<void>>(
+    async () => undefined,
+  );
   const serverConfig = useServerConfig();
 
   const handleWelcome = useEffectEvent((payload: ServerLifecycleWelcomePayload | null) => {
@@ -234,7 +236,11 @@ function EventRouter() {
 
     migrateLocalSettingsToServer();
     void (async () => {
-      await bootstrapFromSnapshotRef.current();
+      const pathnameThreadIdMatch = /^\/([^/]+)$/.exec(readPathname());
+      const pathnameThreadId = pathnameThreadIdMatch?.[1]
+        ? ThreadId.makeUnsafe(decodeURIComponent(pathnameThreadIdMatch[1]))
+        : null;
+      await bootstrapFromSnapshotRef.current(payload.bootstrapThreadId ?? pathnameThreadId);
       if (disposedRef.current) {
         return;
       }
@@ -488,7 +494,10 @@ function EventRouter() {
       }
     };
 
-    const runSnapshotRecovery = async (reason: "bootstrap" | "replay-failed"): Promise<void> => {
+    const runSnapshotRecovery = async (
+      reason: "bootstrap" | "replay-failed",
+      preferredThreadId?: ThreadId | null,
+    ): Promise<void> => {
       const started = recovery.beginSnapshotRecovery(reason);
       if (import.meta.env.MODE !== "test") {
         const state = recovery.getState();
@@ -509,7 +518,9 @@ function EventRouter() {
       }
 
       try {
-        const snapshot = await api.orchestration.getSnapshot();
+        const snapshot = await api.orchestration.getSnapshot(
+          preferredThreadId ? { hydratedThreadIds: [preferredThreadId] } : {},
+        );
         if (!disposed) {
           syncServerReadModel(snapshot);
           reconcileSnapshotDerivedState();
@@ -523,13 +534,17 @@ function EventRouter() {
       }
     };
 
-    const bootstrapFromSnapshot = async (): Promise<void> => {
-      await runSnapshotRecovery("bootstrap");
+    const bootstrapFromSnapshot = async (preferredThreadId?: ThreadId | null): Promise<void> => {
+      await runSnapshotRecovery("bootstrap", preferredThreadId);
     };
     bootstrapFromSnapshotRef.current = bootstrapFromSnapshot;
 
     const fallbackToSnapshotRecovery = async (): Promise<void> => {
-      await runSnapshotRecovery("replay-failed");
+      const pathnameThreadIdMatch = /^\/([^/]+)$/.exec(readPathname());
+      const pathnameThreadId = pathnameThreadIdMatch?.[1]
+        ? ThreadId.makeUnsafe(decodeURIComponent(pathnameThreadIdMatch[1]))
+        : null;
+      await runSnapshotRecovery("replay-failed", pathnameThreadId);
     };
     const unsubDomainEvent = api.orchestration.onDomainEvent(
       (event) => {

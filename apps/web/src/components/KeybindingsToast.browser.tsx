@@ -122,6 +122,11 @@ function createMinimalSnapshot(): OrchestrationReadModel {
         updatedAt: NOW_ISO,
         archivedAt: null,
         deletedAt: null,
+        latestUserMessageAt: NOW_ISO,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+        hasActionableProposedPlan: false,
+        hydrated: true,
         messages: [
           {
             id: "msg-1" as MessageId,

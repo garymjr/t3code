@@ -9,6 +9,7 @@ import {
   type OrchestrationEvent,
   OrchestrationGetFullThreadDiffError,
   OrchestrationGetSnapshotError,
+  OrchestrationGetThreadError,
   OrchestrationGetTurnDiffError,
   ORCHESTRATION_WS_METHODS,
   ProjectSearchEntriesError,
@@ -361,13 +362,39 @@ const WsRpcLayer = WsRpcGroup.toLayer(
       [ORCHESTRATION_WS_METHODS.getSnapshot]: (_input) =>
         observeRpcEffect(
           ORCHESTRATION_WS_METHODS.getSnapshot,
-          projectionSnapshotQuery.getSnapshot().pipe(
+          projectionSnapshotQuery.getSnapshot(_input).pipe(
             Effect.mapError(
               (cause) =>
                 new OrchestrationGetSnapshotError({
                   message: "Failed to load orchestration snapshot",
                   cause,
                 }),
+            ),
+          ),
+          { "rpc.aggregate": "orchestration" },
+        ),
+      [ORCHESTRATION_WS_METHODS.getThread]: (input) =>
+        observeRpcEffect(
+          ORCHESTRATION_WS_METHODS.getThread,
+          projectionSnapshotQuery.getThread(input.threadId).pipe(
+            Effect.flatMap((thread) =>
+              Option.match(thread, {
+                onNone: () =>
+                  Effect.fail(
+                    new OrchestrationGetThreadError({
+                      message: "Thread not found",
+                    }),
+                  ),
+                onSome: Effect.succeed,
+              }),
+            ),
+            Effect.mapError((cause) =>
+              Schema.is(OrchestrationGetThreadError)(cause)
+                ? cause
+                : new OrchestrationGetThreadError({
+                    message: "Failed to load thread",
+                    cause,
+                  }),
             ),
           ),
           { "rpc.aggregate": "orchestration" },

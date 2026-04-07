@@ -171,6 +171,11 @@ function mapThread(thread: OrchestrationThread): Thread {
     archivedAt: thread.archivedAt,
     updatedAt: thread.updatedAt,
     latestTurn: thread.latestTurn,
+    latestUserMessageAt: thread.latestUserMessageAt ?? null,
+    hasPendingApprovals: thread.hasPendingApprovals ?? false,
+    hasPendingUserInput: thread.hasPendingUserInput ?? false,
+    hasActionableProposedPlan: thread.hasActionableProposedPlan ?? false,
+    hydrated: thread.hydrated ?? false,
     pendingSourceProposedPlan: thread.latestTurn?.sourceProposedPlan,
     branch: thread.branch,
     worktreePath: thread.worktreePath,
@@ -193,23 +198,6 @@ function mapProject(project: OrchestrationReadModel["projects"][number]): Projec
   };
 }
 
-function getLatestUserMessageAt(
-  messages: ReadonlyArray<Thread["messages"][number]>,
-): string | null {
-  let latestUserMessageAt: string | null = null;
-
-  for (const message of messages) {
-    if (message.role !== "user") {
-      continue;
-    }
-    if (latestUserMessageAt === null || message.createdAt > latestUserMessageAt) {
-      latestUserMessageAt = message.createdAt;
-    }
-  }
-
-  return latestUserMessageAt;
-}
-
 function buildSidebarThreadSummary(thread: Thread): SidebarThreadSummary {
   return {
     id: thread.id,
@@ -223,12 +211,10 @@ function buildSidebarThreadSummary(thread: Thread): SidebarThreadSummary {
     latestTurn: thread.latestTurn,
     branch: thread.branch,
     worktreePath: thread.worktreePath,
-    latestUserMessageAt: getLatestUserMessageAt(thread.messages),
-    hasPendingApprovals: derivePendingApprovals(thread.activities).length > 0,
-    hasPendingUserInput: derivePendingUserInputs(thread.activities).length > 0,
-    hasActionableProposedPlan: hasActionableProposedPlan(
-      findLatestProposedPlan(thread.proposedPlans, thread.latestTurn?.turnId ?? null),
-    ),
+    latestUserMessageAt: thread.latestUserMessageAt ?? null,
+    hasPendingApprovals: thread.hasPendingApprovals ?? false,
+    hasPendingUserInput: thread.hasPendingUserInput ?? false,
+    hasActionableProposedPlan: thread.hasActionableProposedPlan ?? false,
   };
 }
 
@@ -658,6 +644,11 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
         updatedAt: event.payload.updatedAt,
         archivedAt: null,
         deletedAt: null,
+        latestUserMessageAt: null,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+        hasActionableProposedPlan: false,
+        hydrated: false,
         messages: [],
         proposedPlans: [],
         activities: [],
@@ -881,9 +872,18 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
                 assistantMessageId: event.payload.messageId,
               })
             : thread.latestTurn;
+        const currentLatestUserMessageAt = thread.latestUserMessageAt ?? null;
         return {
           ...thread,
+          hydrated: true,
           messages: cappedMessages,
+          latestUserMessageAt:
+            message.role === "user"
+              ? currentLatestUserMessageAt === null ||
+                message.createdAt > currentLatestUserMessageAt
+                ? message.createdAt
+                : currentLatestUserMessageAt
+              : currentLatestUserMessageAt,
           turnDiffSummaries,
           latestTurn,
           updatedAt: event.occurredAt,
@@ -954,7 +954,11 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
           .slice(-MAX_THREAD_PROPOSED_PLANS);
         return {
           ...thread,
+          hydrated: true,
           proposedPlans,
+          hasActionableProposedPlan: hasActionableProposedPlan(
+            findLatestProposedPlan(proposedPlans, thread.latestTurn?.turnId ?? null),
+          ),
           updatedAt: event.occurredAt,
         };
       });
@@ -1002,6 +1006,7 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
             : thread.latestTurn;
         return {
           ...thread,
+          hydrated: true,
           turnDiffSummaries,
           latestTurn,
           updatedAt: event.occurredAt,
@@ -1038,10 +1043,18 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
 
         return {
           ...thread,
+          hydrated: true,
           turnDiffSummaries,
           messages,
           proposedPlans,
           activities,
+          latestUserMessageAt:
+            messages.toReversed().find((message) => message.role === "user")?.createdAt ?? null,
+          hasPendingApprovals: derivePendingApprovals(activities).length > 0,
+          hasPendingUserInput: derivePendingUserInputs(activities).length > 0,
+          hasActionableProposedPlan: hasActionableProposedPlan(
+            findLatestProposedPlan(proposedPlans, latestCheckpoint?.turnId ?? null),
+          ),
           pendingSourceProposedPlan: undefined,
           latestTurn:
             latestCheckpoint === null
@@ -1071,7 +1084,10 @@ export function applyOrchestrationEvent(state: AppState, event: OrchestrationEve
           .slice(-MAX_THREAD_ACTIVITIES);
         return {
           ...thread,
+          hydrated: true,
           activities,
+          hasPendingApprovals: derivePendingApprovals(activities).length > 0,
+          hasPendingUserInput: derivePendingUserInputs(activities).length > 0,
           updatedAt: event.occurredAt,
         };
       });
@@ -1140,10 +1156,44 @@ export function setThreadBranch(
   });
 }
 
+export function hydrateThread(state: AppState, threadSnapshot: OrchestrationThread): AppState {
+  const nextThread = mapThread(threadSnapshot);
+  const existing = state.threads.find((thread) => thread.id === nextThread.id);
+  if (!existing) {
+    const threads = [...state.threads, nextThread];
+    return {
+      ...state,
+      threads,
+      sidebarThreadsById: {
+        ...state.sidebarThreadsById,
+        [nextThread.id]: buildSidebarThreadSummary(nextThread),
+      },
+      threadIdsByProjectId: appendThreadIdByProjectId(
+        state.threadIdsByProjectId,
+        nextThread.projectId,
+        nextThread.id,
+      ),
+    };
+  }
+
+  const threads = state.threads.map((thread) =>
+    thread.id === nextThread.id ? nextThread : thread,
+  );
+  return {
+    ...state,
+    threads,
+    sidebarThreadsById: {
+      ...state.sidebarThreadsById,
+      [nextThread.id]: buildSidebarThreadSummary(nextThread),
+    },
+  };
+}
+
 // ── Zustand store ────────────────────────────────────────────────────
 
 interface AppStore extends AppState {
   syncServerReadModel: (readModel: OrchestrationReadModel) => void;
+  hydrateThread: (threadSnapshot: OrchestrationThread) => void;
   applyOrchestrationEvent: (event: OrchestrationEvent) => void;
   applyOrchestrationEvents: (events: ReadonlyArray<OrchestrationEvent>) => void;
   setError: (threadId: ThreadId, error: string | null) => void;
@@ -1153,6 +1203,7 @@ interface AppStore extends AppState {
 export const useStore = create<AppStore>((set) => ({
   ...initialState,
   syncServerReadModel: (readModel) => set((state) => syncServerReadModel(state, readModel)),
+  hydrateThread: (threadSnapshot) => set((state) => hydrateThread(state, threadSnapshot)),
   applyOrchestrationEvent: (event) => set((state) => applyOrchestrationEvent(state, event)),
   applyOrchestrationEvents: (events) => set((state) => applyOrchestrationEvents(state, events)),
   setError: (threadId, error) => set((state) => setError(state, threadId, error)),

@@ -6,7 +6,9 @@ import {
   type GitStatusStreamEvent,
   type NativeApi,
   ORCHESTRATION_WS_METHODS,
+  type OrchestrationReadModel,
   type ServerSettingsPatch,
+  type ThreadId,
   WS_METHODS,
 } from "@t3tools/contracts";
 import { applyGitStatusStreamEvent } from "@t3tools/shared/git";
@@ -100,7 +102,10 @@ export interface WsRpcClient {
     readonly subscribeLifecycle: RpcStreamMethod<typeof WS_METHODS.subscribeServerLifecycle>;
   };
   readonly orchestration: {
-    readonly getSnapshot: RpcUnaryNoArgMethod<typeof ORCHESTRATION_WS_METHODS.getSnapshot>;
+    readonly getSnapshot: (input?: {
+      hydratedThreadIds?: ThreadId[];
+    }) => Promise<OrchestrationReadModel>;
+    readonly getThread: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.getThread>;
     readonly dispatchCommand: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.dispatchCommand>;
     readonly getTurnDiff: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.getTurnDiff>;
     readonly getFullThreadDiff: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.getFullThreadDiff>;
@@ -227,8 +232,10 @@ export function createWsRpcClient(transport = new WsTransport()): WsRpcClient {
         ),
     },
     orchestration: {
-      getSnapshot: () =>
-        transport.request((client) => client[ORCHESTRATION_WS_METHODS.getSnapshot]({})),
+      getSnapshot: (input = {}) =>
+        transport.request((client) => client[ORCHESTRATION_WS_METHODS.getSnapshot](input)),
+      getThread: (input) =>
+        transport.request((client) => client[ORCHESTRATION_WS_METHODS.getThread](input)),
       dispatchCommand: (input) =>
         transport.request((client) => client[ORCHESTRATION_WS_METHODS.dispatchCommand](input)),
       getTurnDiff: (input) =>

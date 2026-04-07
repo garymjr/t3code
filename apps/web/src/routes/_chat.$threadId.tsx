@@ -18,6 +18,7 @@ import {
 } from "../diffRouteSearch";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useStore } from "../store";
+import { readNativeApi } from "../nativeApi";
 import { Sheet, SheetPopup } from "../components/ui/sheet";
 import { Sidebar, SidebarInset, SidebarProvider, SidebarRail } from "~/components/ui/sidebar";
 
@@ -168,6 +169,10 @@ function ChatThreadRouteView() {
   });
   const search = Route.useSearch();
   const threadExists = useStore((store) => store.threads.some((thread) => thread.id === threadId));
+  const threadHydrated = useStore(
+    (store) => store.threads.find((thread) => thread.id === threadId)?.hydrated ?? false,
+  );
+  const hydrateThread = useStore((store) => store.hydrateThread);
   const draftThreadExists = useComposerDraftStore((store) =>
     Object.hasOwn(store.draftThreadsByThreadId, threadId),
   );
@@ -211,6 +216,30 @@ function ChatThreadRouteView() {
       return;
     }
   }, [bootstrapComplete, navigate, routeThreadExists, threadId]);
+
+  useEffect(() => {
+    if (!bootstrapComplete || !threadExists || threadHydrated || draftThreadExists) {
+      return;
+    }
+    const api = readNativeApi();
+    if (!api) {
+      return;
+    }
+
+    let cancelled = false;
+    void api.orchestration
+      .getThread({ threadId })
+      .then((thread) => {
+        if (!cancelled) {
+          hydrateThread(thread);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrapComplete, draftThreadExists, hydrateThread, threadExists, threadHydrated, threadId]);
 
   if (!bootstrapComplete || !routeThreadExists) {
     return null;

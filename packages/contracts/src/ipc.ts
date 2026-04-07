@@ -42,6 +42,8 @@ import type {
 import type { ServerUpsertKeybindingInput } from "./server";
 import type {
   ClientOrchestrationCommand,
+  OrchestrationGetThreadInput,
+  OrchestrationGetThreadResult,
   OrchestrationGetFullThreadDiffInput,
   OrchestrationGetFullThreadDiffResult,
   OrchestrationGetTurnDiffInput,
@@ -50,6 +52,7 @@ import type {
   OrchestrationReadModel,
 } from "./orchestration";
 import { EditorId } from "./editor";
+import type { ThreadId } from "./baseSchemas";
 import { ServerSettings, ServerSettingsPatch } from "./settings";
 
 export interface ContextMenuItem<T extends string = string> {
@@ -182,7 +185,8 @@ export interface NativeApi {
     updateSettings: (patch: ServerSettingsPatch) => Promise<ServerSettings>;
   };
   orchestration: {
-    getSnapshot: () => Promise<OrchestrationReadModel>;
+    getSnapshot: (input?: { hydratedThreadIds?: ThreadId[] }) => Promise<OrchestrationReadModel>;
+    getThread: (input: OrchestrationGetThreadInput) => Promise<OrchestrationGetThreadResult>;
     dispatchCommand: (command: ClientOrchestrationCommand) => Promise<{ sequence: number }>;
     getTurnDiff: (input: OrchestrationGetTurnDiffInput) => Promise<OrchestrationGetTurnDiffResult>;
     getFullThreadDiff: (

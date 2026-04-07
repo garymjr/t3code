@@ -225,7 +225,9 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
         sequence += 1;
       }
 
-      const snapshot = yield* snapshotQuery.getSnapshot();
+      const snapshot = yield* snapshotQuery.getSnapshot({
+        hydratedThreadIds: [ThreadId.makeUnsafe("thread-1")],
+      });
 
       assert.equal(snapshot.snapshotSequence, 5);
       assert.equal(snapshot.updatedAt, "2026-02-24T00:00:09.000Z");
@@ -281,6 +283,11 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           updatedAt: "2026-02-24T00:00:03.000Z",
           archivedAt: null,
           deletedAt: null,
+          latestUserMessageAt: null,
+          hasPendingApprovals: false,
+          hasPendingUserInput: false,
+          hasActionableProposedPlan: false,
+          hydrated: true,
           messages: [
             {
               id: asMessageId("message-1"),

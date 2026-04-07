@@ -17,6 +17,7 @@ import {
 
 export const ORCHESTRATION_WS_METHODS = {
   getSnapshot: "orchestration.getSnapshot",
+  getThread: "orchestration.getThread",
   dispatchCommand: "orchestration.dispatchCommand",
   getTurnDiff: "orchestration.getTurnDiff",
   getFullThreadDiff: "orchestration.getFullThreadDiff",
@@ -282,6 +283,11 @@ export const OrchestrationThread = Schema.Struct({
   updatedAt: IsoDateTime,
   archivedAt: Schema.NullOr(IsoDateTime).pipe(Schema.withDecodingDefault(() => null)),
   deletedAt: Schema.NullOr(IsoDateTime),
+  latestUserMessageAt: Schema.optionalKey(Schema.NullOr(IsoDateTime)),
+  hasPendingApprovals: Schema.optionalKey(Schema.Boolean),
+  hasPendingUserInput: Schema.optionalKey(Schema.Boolean),
+  hasActionableProposedPlan: Schema.optionalKey(Schema.Boolean),
+  hydrated: Schema.optionalKey(Schema.Boolean),
   messages: Schema.Array(OrchestrationMessage),
   proposedPlans: Schema.Array(OrchestrationProposedPlan).pipe(Schema.withDecodingDefault(() => [])),
   activities: Schema.Array(OrchestrationThreadActivity),
@@ -1007,10 +1013,20 @@ export const DispatchResult = Schema.Struct({
 });
 export type DispatchResult = typeof DispatchResult.Type;
 
-export const OrchestrationGetSnapshotInput = Schema.Struct({});
+export const OrchestrationGetSnapshotInput = Schema.Struct({
+  hydratedThreadIds: Schema.optional(Schema.Array(ThreadId)),
+});
 export type OrchestrationGetSnapshotInput = typeof OrchestrationGetSnapshotInput.Type;
 const OrchestrationGetSnapshotResult = OrchestrationReadModel;
 export type OrchestrationGetSnapshotResult = typeof OrchestrationGetSnapshotResult.Type;
+
+export const OrchestrationGetThreadInput = Schema.Struct({
+  threadId: ThreadId,
+});
+export type OrchestrationGetThreadInput = typeof OrchestrationGetThreadInput.Type;
+
+export const OrchestrationGetThreadResult = OrchestrationThread;
+export type OrchestrationGetThreadResult = typeof OrchestrationGetThreadResult.Type;
 
 export const OrchestrationGetTurnDiffInput = TurnCountRange.mapFields(
   Struct.assign({ threadId: ThreadId }),
@@ -1043,6 +1059,10 @@ export const OrchestrationRpcSchemas = {
     input: OrchestrationGetSnapshotInput,
     output: OrchestrationGetSnapshotResult,
   },
+  getThread: {
+    input: OrchestrationGetThreadInput,
+    output: OrchestrationGetThreadResult,
+  },
   dispatchCommand: {
     input: ClientOrchestrationCommand,
     output: DispatchResult,
@@ -1071,6 +1091,14 @@ export class OrchestrationGetSnapshotError extends Schema.TaggedErrorClass<Orche
 
 export class OrchestrationDispatchCommandError extends Schema.TaggedErrorClass<OrchestrationDispatchCommandError>()(
   "OrchestrationDispatchCommandError",
+  {
+    message: TrimmedNonEmptyString,
+    cause: Schema.optional(Schema.Defect),
+  },
+) {}
+
+export class OrchestrationGetThreadError extends Schema.TaggedErrorClass<OrchestrationGetThreadError>()(
+  "OrchestrationGetThreadError",
   {
     message: TrimmedNonEmptyString,
     cause: Schema.optional(Schema.Defect),

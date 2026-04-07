@@ -29,6 +29,7 @@ import {
   FileSystem,
   Layer,
   ManagedRuntime,
+  Option,
   Path,
   Stream,
 } from "effect";
@@ -125,6 +126,11 @@ const makeDefaultOrchestrationReadModel = () => {
         updatedAt: now,
         archivedAt: null,
         latestTurn: null,
+        latestUserMessageAt: null,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+        hasActionableProposedPlan: false,
+        hydrated: true,
         messages: [],
         session: null,
         activities: [],
@@ -372,6 +378,7 @@ const buildAppUnderTest = (options?: {
       Layer.provide(
         Layer.mock(ProjectionSnapshotQuery)({
           getSnapshot: () => Effect.succeed(makeDefaultOrchestrationReadModel()),
+          getThread: () => Effect.succeed(Option.none()),
           ...options?.layers?.projectionSnapshotQuery,
         }),
       ),
@@ -1922,6 +1929,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         layers: {
           projectionSnapshotQuery: {
             getSnapshot: () => Effect.succeed(snapshot),
+            getThread: () => Effect.succeed(Option.none()),
           },
           orchestrationEngine: {
             dispatch: () => Effect.succeed({ sequence: 7 }),
@@ -2510,6 +2518,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                   detail: "projection unavailable",
                 }),
               ),
+            getThread: () => Effect.succeed(Option.none()),
           },
         },
       });

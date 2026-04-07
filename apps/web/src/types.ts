@@ -104,6 +104,11 @@ export interface Thread {
   archivedAt: string | null;
   updatedAt?: string | undefined;
   latestTurn: OrchestrationLatestTurn | null;
+  latestUserMessageAt?: string | null;
+  hasPendingApprovals?: boolean;
+  hasPendingUserInput?: boolean;
+  hasActionableProposedPlan?: boolean;
+  hydrated?: boolean;
   pendingSourceProposedPlan?: OrchestrationLatestTurn["sourceProposedPlan"];
   branch: string | null;
   worktreePath: string | null;
